@@ -2,69 +2,67 @@ pipeline {
     agent any
 
     environment {
-        SERVER_IP = credentials('SERVER_IP')
-        DOCKERHUB_CREDENTIALS = credentials('DOCKERHUB_CREDENTIALS')
-        EC2_PEM_KEY = credentials('EC2_PEM_KEY')
-    }
-
-    triggers {
-        pollSCM('H/1 * * * *')
+        // Docker Hub credentials
+        DOCKER_HUB_CREDS = credentials('DOCKERHUB_CREDENTIALS')
+        // GitHub credentials
+        GIT_CREDENTIALS = credentials('GITHUB_CREDENTIALS')
+        // SSH key for EC2 instance
+        EC2_KEY = credentials('EC2_PEM_KEY')
+        // EC2 server IP
+        REMOTE_HOST = credentials('SERVER_IP')
+        // Docker image name
+        IMAGE_NAME = 'khushboo053/jenkinsdemo'
     }
 
     stages {
         stage('Checkout Code') {
             steps {
-                echo "📥 Cloning the GitHub Repository..."
-                checkout scm
+                git credentialsId: "${GIT_CREDENTIALS}", url: 'https://github.com/Khushboo-Mishkaat/JenkinsNodePipeline.git'
             }
         }
 
         stage('Build Docker Image') {
             steps {
-                echo "🐳 Building Docker Image..."
-                sh '''
-                echo "DEBUG: Using DockerHub Credentials ID: DOCKERHUB_CREDENTIALS"
-                docker build -t jenkinsdemo:${BRANCH_NAME} .
-                '''
-            }
-        }
-
-        stage('Push Docker Image') {
-            steps {
-                echo "☁️ Pushing Docker Image to Docker Hub..."
-                withCredentials([usernamePassword(credentialsId: 'DOCKERHUB_CREDENTIALS', usernameVariable: 'DOCKER_USERNAME', passwordVariable: 'DOCKER_PASSWORD')]) {
-                    sh '''
-                    echo "DEBUG: Logging into DockerHub..."
-                    docker login -u $DOCKER_USERNAME -p $DOCKER_PASSWORD
-                    docker tag jenkinsdemo:${BRANCH_NAME} $DOCKER_USERNAME/jenkinsdemo:${BRANCH_NAME}
-                    docker push $DOCKER_USERNAME/jenkinsdemo:${BRANCH_NAME}
-                    '''
+                script {
+                    sh "docker build -t ${IMAGE_NAME}:${env.BUILD_NUMBER} ."
                 }
             }
         }
 
-        stage('Deploy to Server') {
-            when {
-                branch 'main'
-            }
+        stage('Push to Docker Hub') {
             steps {
-                echo "🚀 Deploying to Server (Main Branch Only)..."
-                withCredentials([usernamePassword(credentialsId: 'DOCKERHUB_CREDENTIALS', usernameVariable: 'DOCKER_USERNAME', passwordVariable: 'DOCKER_PASSWORD')]) {
-                    sh '''
-                    echo "DEBUG: Using DockerHub Credentials ID: DOCKERHUB_CREDENTIALS"
-                    ssh -i $EC2_PEM_KEY -o StrictHostKeyChecking=no ubuntu@$SERVER_IP '
-                    if docker pull $DOCKER_USERNAME/jenkinsdemo:main; then
-                        docker stop jenkinsdemo || true
-                        docker rm jenkinsdemo || true
-                        docker run -d --name jenkinsdemo -p 3000:3000 $DOCKER_USERNAME/jenkinsdemo:main
-                    else
-                        echo "❌ Failed to pull the Docker image. Please check the image name or DockerHub credentials."
-                        exit 1
-                    fi
-                    '
-                    '''
+                script {
+                    sh "echo ${DOCKER_HUB_CREDS_PSW} | docker login -u ${DOCKER_HUB_CREDS_USR} --password-stdin"
+                    sh "docker push ${IMAGE_NAME}:${env.BUILD_NUMBER}"
                 }
             }
+        }
+
+        stage('Deploy to EC2') {
+            steps {
+                script {
+                    // Save private key to temporary file
+                    writeFile file: 'ec2-key.pem', text: "${EC2_KEY}"
+                    sh 'chmod 400 ec2-key.pem'
+
+                    // Deploy via SSH
+                    sh """
+                        ssh -o StrictHostKeyChecking=no -i ec2-key.pem ubuntu@${REMOTE_HOST} << EOF
+                        docker pull ${IMAGE_NAME}:${env.BUILD_NUMBER}
+                        docker stop myapp || true
+                        docker rm myapp || true
+                        docker run -d --name myapp -p 80:80 ${IMAGE_NAME}:${env.BUILD_NUMBER}
+                        EOF
+                    """
+                }
+            }
+        }
+    }
+
+    post {
+        always {
+            // Cleanup
+            sh 'rm -f ec2-key.pem'
         }
     }
 }
