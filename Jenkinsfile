@@ -3,12 +3,11 @@ pipeline {
 
     environment {
         SERVER_IP = credentials('SERVER_IP')
-        DOCKERHUB_USERNAME = credentials('DOCKERHUB_USERNAME')
-        DOCKERHUB_PASSWORD = credentials('DOCKERHUB_PASSWORD')
+        DOCKERHUB_CREDENTIALS = credentials('DOCKERHUB_CREDENTIALS')
     }
 
     triggers {
-        pollSCM('H/1 * * * *') // Polling every minute (H/1 means every minute)
+        pollSCM('H/1 * * * *')
     }
 
     stages {
@@ -19,44 +18,40 @@ pipeline {
             }
         }
 
-        stage('Build') {
+        stage('Build Docker Image') {
             steps {
-                echo "🔧 Building the Application..."
-                sh 'echo "Simulating Build... (Replace with actual build command)"'
-            }
-        }
-
-        stage('Test') {
-            steps {
-                echo "✅ Running Tests..."
-                sh 'echo "Simulating Tests... (Replace with actual test command)"'
-            }
-        }
-
-        stage('Docker Build and Push') {
-            steps {
-                echo "📦 Building Docker Image..."
+                echo "🐳 Building Docker Image..."
                 sh '''
-                docker login -u $DOCKERHUB_USERNAME -p $DOCKERHUB_PASSWORD
-                docker build -t $DOCKERHUB_USERNAME/jenkinsdemo:latest .
-                docker push $DOCKERHUB_USERNAME/jenkinsdemo:latest
+                docker build -t ${DOCKERHUB_CREDENTIALS_USR}/jenkinsdemo:${BRANCH_NAME} .
+                '''
+            }
+        }
+
+        stage('Push Docker Image') {
+            steps {
+                echo "☁️ Pushing Docker Image to Docker Hub..."
+                sh '''
+                docker login -u ${DOCKERHUB_CREDENTIALS_USR} -p ${DOCKERHUB_CREDENTIALS_PSW}
+                docker push ${DOCKERHUB_CREDENTIALS_USR}/jenkinsdemo:${BRANCH_NAME}
                 '''
             }
         }
 
         stage('Deploy to Server') {
+            when {
+                branch 'main'
+            }
             steps {
-                echo "🚀 Deploying to Server..."
+                echo "🚀 Deploying to Server (Main Branch Only)..."
                 sh '''
                 ssh -o StrictHostKeyChecking=no ubuntu@$SERVER_IP '
-                docker pull $DOCKERHUB_USERNAME/jenkinsdemo:latest
+                docker pull ${DOCKERHUB_CREDENTIALS_USR}/jenkinsdemo:main
                 docker stop jenkinsdemo || true
                 docker rm jenkinsdemo || true
-                docker run -d --name jenkinsdemo -p 3000:3000 $DOCKERHUB_USERNAME/jenkinsdemo:latest
+                docker run -d --name jenkinsdemo -p 3000:3000 ${DOCKERHUB_CREDENTIALS_USR}/jenkinsdemo:main
                 '
                 '''
             }
         }
     }
 }
-
