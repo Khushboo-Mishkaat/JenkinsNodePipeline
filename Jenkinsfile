@@ -24,7 +24,7 @@ pipeline {
                 echo "🐳 Building Docker Image..."
                 sh '''
                 echo "DEBUG: DockerHub Username: ${DOCKERHUB_CREDENTIALS_USR}"
-                docker build -t ${DOCKERHUB_CREDENTIALS_USR}/jenkinsdemo:${BRANCH_NAME} .
+                docker build -t ${DOCKERHUB_CREDENTIALS}/jenkinsdemo:${BRANCH_NAME} .
                 '''
             }
         }
@@ -34,7 +34,7 @@ pipeline {
                 echo "☁️ Pushing Docker Image to Docker Hub..."
                 sh '''
                 docker login -u ${DOCKERHUB_CREDENTIALS_USR} -p ${DOCKERHUB_CREDENTIALS_PSW}
-                docker push ${DOCKERHUB_CREDENTIALS_USR}/jenkinsdemo:${BRANCH_NAME}
+                docker push ${DOCKERHUB_CREDENTIALS}/jenkinsdemo:${BRANCH_NAME}
                 '''
             }
         }
@@ -46,9 +46,9 @@ pipeline {
             steps {
                 echo "🚀 Deploying to Server (Main Branch Only)..."
                 sh '''
-                echo "DEBUG: DockerHub Username: ${DOCKERHUB_CREDENTIALS_USR}"
+                echo "DEBUG: DockerHub Username: ${DOCKERHUB_CREDENTIALS}"
                 ssh -i $EC2_PEM_KEY -o StrictHostKeyChecking=no ubuntu@$SERVER_IP '
-                if docker pull ${DOCKERHUB_CREDENTIALS_USR}/jenkinsdemo:main; then
+                if docker pull ${DOCKERHUB_CREDENTIALS}/jenkinsdemo:main; then
                     docker stop jenkinsdemo || true
                     docker rm jenkinsdemo || true
                     docker run -d --name jenkinsdemo -p 3000:3000 ${DOCKERHUB_CREDENTIALS_USR}/jenkinsdemo:main
