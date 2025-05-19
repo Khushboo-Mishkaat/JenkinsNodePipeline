@@ -23,6 +23,7 @@ pipeline {
             steps {
                 echo "🐳 Building Docker Image..."
                 sh '''
+                echo "DEBUG: DockerHub Username: ${DOCKERHUB_CREDENTIALS_USR}"
                 docker build -t ${DOCKERHUB_CREDENTIALS_USR}/jenkinsdemo:${BRANCH_NAME} .
                 '''
             }
@@ -45,11 +46,16 @@ pipeline {
             steps {
                 echo "🚀 Deploying to Server (Main Branch Only)..."
                 sh '''
+                echo "DEBUG: DockerHub Username: ${DOCKERHUB_CREDENTIALS_USR}"
                 ssh -i $EC2_PEM_KEY -o StrictHostKeyChecking=no ubuntu@$SERVER_IP '
-                docker pull ${DOCKERHUB_CREDENTIALS_USR}/jenkinsdemo:main
-                docker stop jenkinsdemo || true
-                docker rm jenkinsdemo || true
-                docker run -d --name jenkinsdemo -p 3000:3000 ${DOCKERHUB_CREDENTIALS_USR}/jenkinsdemo:main
+                if docker pull ${DOCKERHUB_CREDENTIALS_USR}/jenkinsdemo:main; then
+                    docker stop jenkinsdemo || true
+                    docker rm jenkinsdemo || true
+                    docker run -d --name jenkinsdemo -p 3000:3000 ${DOCKERHUB_CREDENTIALS_USR}/jenkinsdemo:main
+                else
+                    echo "❌ Failed to pull the Docker image. Please check the image name or DockerHub credentials."
+                    exit 1
+                fi
                 '
                 '''
             }
