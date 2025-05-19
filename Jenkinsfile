@@ -1,68 +1,61 @@
 pipeline {
     agent any
+
     environment {
-        SERVER_IP = credentials('SERVER_IP')          // Your EC2 Server IP (Stored as Secret Text in Jenkins)
-        DOCKERHUB_CREDENTIALS = credentials('DOCKERHUB_CREDENTIALS') // Your DockerHub Credentials (Username/Password)
+        SERVER_IP = credentials('SERVER_IP')
+        DOCKERHUB_USERNAME = credentials('DOCKERHUB_USERNAME')
+        DOCKERHUB_PASSWORD = credentials('DOCKERHUB_PASSWORD')
     }
+
+    triggers {
+        pollSCM('H/1 * * * *') // Polling every minute (H/1 means every minute)
+    }
+
     stages {
         stage('Checkout Code') {
             steps {
                 echo "📥 Cloning the GitHub Repository..."
-                checkout scm  // Pulls latest code from your GitHub repo
+                checkout scm
             }
         }
 
         stage('Build') {
             steps {
                 echo "🔧 Building the Application..."
-                sh 'echo "Building JenkinsDemo Application..."'
+                sh 'echo "Simulating Build... (Replace with actual build command)"'
             }
         }
 
         stage('Test') {
             steps {
                 echo "✅ Running Tests..."
-                sh 'echo "Running Tests for JenkinsDemo..."'
+                sh 'echo "Simulating Tests... (Replace with actual test command)"'
             }
         }
 
-        stage('Docker Build & Push') {
+        stage('Docker Build and Push') {
             steps {
-                echo "🐳 Building and Pushing Docker Image..."
-                withCredentials([usernamePassword(credentialsId: 'DOCKERHUB_CREDENTIALS', usernameVariable: 'DOCKERHUB_USERNAME', passwordVariable: 'DOCKERHUB_PASSWORD')]) {
-                    sh """
-                    docker login -u ${DOCKERHUB_USERNAME} -p ${DOCKERHUB_PASSWORD}
-                    docker build -t ${DOCKERHUB_USERNAME}/jenkinsdemo:latest .
-                    docker push ${DOCKERHUB_USERNAME}/jenkinsdemo:latest
-                    """
-                }
+                echo "📦 Building Docker Image..."
+                sh '''
+                docker login -u $DOCKERHUB_USERNAME -p $DOCKERHUB_PASSWORD
+                docker build -t $DOCKERHUB_USERNAME/jenkinsdemo:latest .
+                docker push $DOCKERHUB_USERNAME/jenkinsdemo:latest
+                '''
             }
         }
 
-        stage('Deploy to EC2') {
+        stage('Deploy to Server') {
             steps {
-                echo "🚀 Deploying to EC2..."
-                withCredentials([file(credentialsId: 'EC2_PEM_KEY', variable: 'EC2_PEM_KEY')]) {
-                    sh """
-                    chmod 400 ${EC2_PEM_KEY}
-                    ssh -o StrictHostKeyChecking=no -i ${EC2_PEM_KEY} ubuntu@${env.SERVER_IP} '
-                        docker pull ${DOCKERHUB_USERNAME}/jenkinsdemo:latest &&
-                        docker stop jenkinsdemo || true &&
-                        docker rm jenkinsdemo || true &&
-                        docker run -d --name jenkinsdemo -p 80:80 ${DOCKERHUB_USERNAME}/jenkinsdemo:latest
-                    '
-                    """
-                }
+                echo "🚀 Deploying to Server..."
+                sh '''
+                ssh -o StrictHostKeyChecking=no ubuntu@$SERVER_IP '
+                docker pull $DOCKERHUB_USERNAME/jenkinsdemo:latest
+                docker stop jenkinsdemo || true
+                docker rm jenkinsdemo || true
+                docker run -d --name jenkinsdemo -p 80:80 $DOCKERHUB_USERNAME/jenkinsdemo:latest
+                '
+                '''
             }
-        }
-    }
-
-    post {
-        success {
-            echo "✅ Build, Test, and Deploy completed successfully for JenkinsDemo!"
-        }
-        failure {
-            echo "❌ Pipeline failed. Check the console for details."
         }
     }
 }
