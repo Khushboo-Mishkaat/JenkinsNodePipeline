@@ -23,8 +23,8 @@ pipeline {
             steps {
                 echo "🐳 Building Docker Image..."
                 sh '''
-                echo "DEBUG: DockerHub Username: ${DOCKERHUB_CREDENTIALS_USR}"
-                docker build -t ${DOCKERHUB_CREDENTIALS}/jenkinsdemo:${BRANCH_NAME} .
+                echo "DEBUG: Using DockerHub Credentials ID: DOCKERHUB_CREDENTIALS"
+                docker build -t jenkinsdemo:${BRANCH_NAME} .
                 '''
             }
         }
@@ -32,10 +32,14 @@ pipeline {
         stage('Push Docker Image') {
             steps {
                 echo "☁️ Pushing Docker Image to Docker Hub..."
-                sh '''
-                docker login -u ${DOCKERHUB_CREDENTIALS_USR} -p ${DOCKERHUB_CREDENTIALS_PSW}
-                docker push ${DOCKERHUB_CREDENTIALS}/jenkinsdemo:${BRANCH_NAME}
-                '''
+                withCredentials([usernamePassword(credentialsId: 'DOCKERHUB_CREDENTIALS', usernameVariable: 'DOCKER_USERNAME', passwordVariable: 'DOCKER_PASSWORD')]) {
+                    sh '''
+                    echo "DEBUG: Logging into DockerHub..."
+                    docker login -u $DOCKER_USERNAME -p $DOCKER_PASSWORD
+                    docker tag jenkinsdemo:${BRANCH_NAME} $DOCKER_USERNAME/jenkinsdemo:${BRANCH_NAME}
+                    docker push $DOCKER_USERNAME/jenkinsdemo:${BRANCH_NAME}
+                    '''
+                }
             }
         }
 
@@ -46,12 +50,12 @@ pipeline {
             steps {
                 echo "🚀 Deploying to Server (Main Branch Only)..."
                 sh '''
-                echo "DEBUG: DockerHub Username: ${DOCKERHUB_CREDENTIALS}"
+                echo "DEBUG: Using DockerHub Credentials ID: DOCKERHUB_CREDENTIALS"
                 ssh -i $EC2_PEM_KEY -o StrictHostKeyChecking=no ubuntu@$SERVER_IP '
-                if docker pull ${DOCKERHUB_CREDENTIALS}/jenkinsdemo:main; then
+                if docker pull $DOCKER_USERNAME/jenkinsdemo:main; then
                     docker stop jenkinsdemo || true
                     docker rm jenkinsdemo || true
-                    docker run -d --name jenkinsdemo -p 3000:3000 ${DOCKERHUB_CREDENTIALS_USR}/jenkinsdemo:main
+                    docker run -d --name jenkinsdemo -p 3000:3000 $DOCKER_USERNAME/jenkinsdemo:main
                 else
                     echo "❌ Failed to pull the Docker image. Please check the image name or DockerHub credentials."
                     exit 1
