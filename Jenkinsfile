@@ -4,12 +4,14 @@ pipeline {
     environment {
         // Docker Hub credentials
         DOCKER_HUB_CREDS = credentials('DOCKERHUB_CREDENTIALS')
-        // SSH key for EC2 instance
-        EC2_KEY = credentials('EC2_PEM_KEY')
+        // PEM File Path for SSH
+        PEM_FILE = '/var/lib/jenkins/.ssh/Project_Veroke.pem' // Path to your PEM file
         // EC2 server IP
         REMOTE_HOST = credentials('SERVER_IP')
         // Docker image name
         IMAGE_NAME = 'khushboo053/jenkinsdemo'
+        // Docker Hub Username
+        DOCKERHUB_USERNAME = 'khushboo053'
     }
 
     stages {
@@ -44,16 +46,19 @@ pipeline {
             steps {
                 script {
                     echo "🚀 Deploying to EC2..."
-                    sshagent(['EC2_PEM_KEY']) {
-                        sh """
-                        ssh -o StrictHostKeyChecking=no ubuntu@${REMOTE_HOST} << EOF
-                        docker pull ${IMAGE_NAME}:${env.BUILD_NUMBER}
-                        docker stop myapp || true
-                        docker rm myapp || true
-                        docker run -d --name myapp -p 80:80 ${IMAGE_NAME}:${env.BUILD_NUMBER}
-                        EOF
-                        """
-                    }
+                    sh """
+                    echo "🔧 Using PEM File: ${PEM_FILE}"
+                    chmod 400 ${PEM_FILE}
+                    
+                    ssh -o StrictHostKeyChecking=no -i ${PEM_FILE} ubuntu@${REMOTE_HOST} << EOF
+                        echo "✅ Connected to EC2 Server: ${REMOTE_HOST}"
+                        docker pull ${DOCKERHUB_USERNAME}/jenkinsdemo:main
+                        docker stop jenkinsdemo || true
+                        docker rm jenkinsdemo || true
+                        docker run -d --name jenkinsdemo -p 3000:3000 ${DOCKERHUB_USERNAME}/jenkinsdemo:main
+                        echo "🚀 Application Deployed Successfully!"
+                    EOF
+                    """
                 }
             }
         }
