@@ -4,6 +4,7 @@ pipeline {
     environment {
         SERVER_IP = credentials('SERVER_IP')
         DOCKERHUB_CREDENTIALS = credentials('DOCKERHUB_CREDENTIALS')
+        EC2_PEM_KEY = credentials('EC2_PEM_KEY')
     }
 
     triggers {
@@ -44,7 +45,7 @@ pipeline {
             steps {
                 echo "🚀 Deploying to Server (Main Branch Only)..."
                 sh '''
-                ssh -o StrictHostKeyChecking=no ubuntu@$SERVER_IP '
+                ssh -i $EC2_PEM_KEY -o StrictHostKeyChecking=no ubuntu@$SERVER_IP '
                 docker pull ${DOCKERHUB_CREDENTIALS_USR}/jenkinsdemo:main
                 docker stop jenkinsdemo || true
                 docker rm jenkinsdemo || true
