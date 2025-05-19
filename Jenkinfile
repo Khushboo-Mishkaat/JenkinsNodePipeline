@@ -52,7 +52,7 @@ pipeline {
                 docker pull $DOCKERHUB_USERNAME/jenkinsdemo:latest
                 docker stop jenkinsdemo || true
                 docker rm jenkinsdemo || true
-                docker run -d --name jenkinsdemo -p 80:80 $DOCKERHUB_USERNAME/jenkinsdemo:latest
+                docker run -d --name jenkinsdemo -p 3000:3000 $DOCKERHUB_USERNAME/jenkinsdemo:latest
                 '
                 '''
             }
