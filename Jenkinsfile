@@ -26,7 +26,9 @@ pipeline {
             steps {
                 script {
                     echo "🔧 Building Docker Image..."
-                    sh "docker build -t ${IMAGE_NAME}:${env.BUILD_NUMBER} ."
+                    sh """
+                    docker build -t ${IMAGE_NAME}:${env.BUILD_NUMBER} .
+                    """
                 }
             }
         }
@@ -35,9 +37,10 @@ pipeline {
             steps {
                 script {
                     echo "🚀 Logging into Docker Hub..."
+                    sh """
                     echo ${DOCKER_HUB_CREDS_PSW} | docker login -u ${DOCKER_HUB_CREDS_USR} --password-stdin
                     docker push ${IMAGE_NAME}:${env.BUILD_NUMBER}
-                    }
+                    """
                 }
             }
         }
@@ -47,11 +50,11 @@ pipeline {
                 script {
                     echo "🚀 Deploying to EC2..."
                     sh """
-                    echo "🔧 Using PEM File: ${EC2_PEM_KEY}"
-                    chmod 400 ${EC2_PEM_FILE}
+                    echo "🔧 Using PEM File: ${PEM_FILE}"
+                    chmod 400 ${PEM_FILE}
                     
-                    ssh -o StrictHostKeyChecking=no -i ${EC2_PEM_KEY} ubuntu@${SERVER_IP} << EOF
-                        echo "✅ Connected to EC2 Server: ${SERVER_IP}"
+                    ssh -o StrictHostKeyChecking=no -i ${PEM_FILE} ubuntu@${REMOTE_HOST} << EOF
+                        echo "✅ Connected to EC2 Server: ${REMOTE_HOST}"
                         docker pull ${DOCKERHUB_USERNAME}/jenkinsdemo:main
                         docker stop jenkinsdemo || true
                         docker rm jenkinsdemo || true
