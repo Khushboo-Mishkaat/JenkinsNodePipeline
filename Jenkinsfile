@@ -55,7 +55,7 @@ pipeline {
                     
                     ssh -o StrictHostKeyChecking=no -i ${PEM_FILE} ubuntu@${REMOTE_HOST} << 'EOF'
                         echo "✅ Connected to EC2 Server: ${REMOTE_HOST}"
-                        docker pull ${DOCKERHUB_USERNAME}/jenkinsdemo:main
+                         docker pull ${DOCKERHUB_USERNAME}/jenkinsdemo:latest
                         docker stop jenkinsdemo || true
                         docker rm jenkinsdemo || true
                         docker run -d --name jenkinsdemo -p 3000:3000 ${DOCKERHUB_USERNAME}/jenkinsdemo:main
