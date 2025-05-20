@@ -35,8 +35,8 @@ pipeline {
             steps {
                 script {
                     echo "🚀 Logging into Docker Hub..."
-                    docker.withRegistry('https://index.docker.io/v1/', "${DOCKER_HUB_CREDS}") {
-                        sh "docker push ${IMAGE_NAME}:${env.BUILD_NUMBER}"
+                    echo ${DOCKER_HUB_CREDS_PSW} | docker login -u ${DOCKER_HUB_CREDS_USR} --password-stdin
+                    docker push ${IMAGE_NAME}:${env.BUILD_NUMBER}
                     }
                 }
             }
